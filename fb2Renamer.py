@@ -9,23 +9,21 @@
     "nameFromFile":"" - наименование файла из него самого, чаще всего русское название
     "size":123 - размер файла в байтах на тот случай
 """
-#todo переносить не переименованные файлы в папку deleted
-#todo сделать флаги на полное удаление и параметры водящего каталога с  проверкой на окончение символа \
+
 #todo проверка если у файла в названии уже есть постфикс больше 9
 #todo нормальные логи с подсветкой (по возможности)
 #todo вывести в конце кол-во файлов общее, переименованных, на удаленте
-#todo исправить\дополнить комментарии к коду
-#todo попробовать комментарии в виде документации
+#todo исправить\дополнить комментарии к коду в виде документации
 #todo научиться извлекать книги из архивов и работать с ними
 
 import json
 import os
 import xml.etree.ElementTree as ET
 import argparse
-from send2trash import send2trash
+import send2trash
 
 
-class Book:    
+class Book:
     def __init__(self, name, file, size):
         self.name = name.strip().replace("<", "").replace(">", "").replace(":", "").replace("«", "").replace("/", "").replace("|", "").replace("?", "").replace("*", "").replace("\\", "").replace("»","")
         self.file = file
@@ -126,8 +124,8 @@ def renameFile(old_name, new_name):
 def delFileBook(fileName):
     _filePath = f'{homeDir}\\{fileName}'
     # если стоти флаг удалять в корзину, включен по умолчанию
-    if (args.delToTrash):
-        send2trash(_filePath)
+    if args.delToTrash:
+        send2trash.send2trash(_filePath)
     else:
         os.remove(_filePath)
 
@@ -157,9 +155,9 @@ def diffBooks(nBook):
                     nBook.name = newBookName(nBook.name)
                     isNewBook = True
                 else:
-                    if (args.delFile):
+                    if args.delFile:
                         delFileBook(nBook.File)
-                    if (args.remFile):
+                    if args.remFile:
                         remFileBook(nBook.File)
                 break
 
@@ -176,22 +174,22 @@ def checkHomeDir(path):
         return path
 
 
-homeDir  = '' # директория в короторуй будут искаться книги включая подкаталоги
+homeDir  = '' 
 library = []# переменная для хранения данных из json файла
 currentpath = ''
 
 print('Program run...')
 
-# именнованные параметры
-parser = argparse.ArgumentParser()
+# определение именнованных параметров
+parser = argparse.ArgumentParser(prog='fb2Renamer', description='Rename file fb2 as book name in file')
 parser.add_argument('--path', help='Путь к входному файлу', type=str, required=True)
 parser.add_argument('--delFile', help='Удалять файл', type=bool, default=False)
 parser.add_argument('--delToTrash', help='Даление в корзину. Включен по умолчанию, срабатывает только при включении удаления', type=bool, default=True)
 parser.add_argument('--remFile', help='Переносить в папку delete файлы книг которые уже есть', type=bool, default=False)
 args = parser.parse_args()
 
-honeDir = checkHomeDir(args.path)
-removeDir = f'{homeDir}\\removedBooks\\'
+homeDir = checkHomeDir(args.path) # директория в короторуй будут искаться книги включая подкаталоги
+removeDir = f'{homeDir}\\removedBooks\\' # директория куда будут переноситься файля, для проверки их пользователем
 loadLibrary()
 dirTravel(homeDir)
 saveJson(library)
