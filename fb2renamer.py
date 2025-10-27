@@ -157,4 +157,5 @@ saveJson(library)
 # не закрываем консоль, чтобы можно было посмотреть результат работы программы
 print('Program finish.')
 print('Press ANY key to close.')
+
 input()
