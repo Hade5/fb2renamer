@@ -29,6 +29,16 @@ class Book:
         self.file = file
         self.size = size
 
+def log(text, color):
+    match color:
+        case "red":
+            print("\033[31m {}\033[0m" .format(text))
+        case "green":
+            print("\033[32m {}\033[0m" .format(text))
+        case "yellow":
+            print("\033[33m {}\033[0m" .format(text))
+        case "blue":
+            print("\033[34m {}\033[0m" .format(text))
 
 # Загрудаем данные об уже обработанных файлах
 # Если файл с бибилотекой существует подгружаем из него данные, иначе создаем его
@@ -44,9 +54,9 @@ def loadLibrary():
 def dirTravel(inPath):
     global currentpath
 
-    for root, dirs, files in os.walk(inPath):
+    for root, dirs, files in os.walk(inPath):        
         currentpath = root+'\\'
-        print(f'Current path: {currentpath}.')
+        print(f'Current path: {currentpath}')
         for file in files:
             currentFile = f'{root}\\{file}'
             if os.path.splitext(file)[1].lower() == '.fb2':
@@ -116,17 +126,21 @@ def newBookName(bookname):
 
 # переименоване файла в название книги
 def renameFile(old_name, new_name):
-    os.rename(f'{currentpath}{old_name}', f'{currentpath}{new_name}')
-    print(f'\tFile {old_name} renemaed to {new_name}.')
-
+    try:
+        os.rename(f'{currentpath}{old_name}', f'{currentpath}{new_name}')
+        log(f'\tFile {old_name} renemaed to {new_name}.','green')
+    except:
+        log(f'\tError in rename {old_name} to {new_name}.','red')
 
 # Удаляем файл с книгой, которая уже есть в библиотеке
 def delFileBook(fileName):
     _filePath = f'{homeDir}\\{fileName}'
     # если стоти флаг удалять в корзину, включен по умолчанию
     if args.delToTrash:
+        log(f'\tDelete file to trash: {fileName}.','red')
         send2trash.send2trash(_filePath)
     else:
+        log(f'\tDelete file: {fileName}.','red')
         os.remove(_filePath)
 
 # Переносим файл с книгой, которая уже есть в библиотеке
@@ -134,37 +148,42 @@ def remFileBook(fileName):
     if not os.path.exists(removeDir):
         os.mkdir(removeDir)
     os.rename(f'{homeDir}\\{fileName}', f'{removeDir}\\{fileName}')
+    log(f'\tRemove file to "removedBooks" folder: {fileName}.','yellow')
 
 # сравниваем полученые данные файла с уже имеющимися
 def diffBooks(nBook):
     print(f'\tSearch in library book: {nBook.name}.')
     isNewBook = False
 
-    if len(library) == 0:
-        isNewBook = True
-    else:
-        for _book in library:
-            #bk = _book#type('Book', (), _book)
-            if _book.name != nBook.name:
-                isNewBook = True
-            else:
-                isNewBook = False
-
-                if _book.size != nBook.size:
-                    print(f'\tMisatch names book but not size: {nBook.name}')
-                    nBook.name = newBookName(nBook.name)
+    if nBook.file != nBook.name:
+        if len(library) == 0:
+            isNewBook = True
+        else:
+            for _book in library:
+                # нужна проверка на тип объеекта, т.к. и json файла данные считываются в формате словаря,
+                # но при добавлении в память все еще счиатеся классом
+                if type(_book) == dict:
+                    _book = type('Book', (), _book) # преобразование объекта в тип класса, оставлен как пример
+                if _book.name != nBook.name:
                     isNewBook = True
                 else:
-                    if args.delFile:
-                        delFileBook(nBook.File)
-                    if args.remFile:
-                        remFileBook(nBook.File)
-                break
+                    isNewBook = False
 
-    if isNewBook:
-        print(f'\tNew book from library: {nBook.name}')
-        renameFile(nBook.file, nBook.name)
-        library.append(nBook)
+                    if _book.size != nBook.size:
+                        print(f'\tMatch names book but not size: {nBook.name}')
+                        nBook.name = newBookName(nBook.name)
+                        isNewBook = True
+                    else:
+                        if args.delFile:
+                            delFileBook(nBook.file)
+                        if args.remFile:
+                            remFileBook(nBook.file)
+                    break
+
+        if isNewBook:
+            print(f'\tNew book from library: {nBook.name}')
+            renameFile(nBook.file, nBook.name)
+            library.append(nBook)
 
 # проверяем, что введенная строка пути не заканчивается символом \
 def checkHomeDir(path):
@@ -189,7 +208,7 @@ parser.add_argument('--remFile', help='Переносить в папку delete
 args = parser.parse_args()
 
 homeDir = checkHomeDir(args.path) # директория в короторуй будут искаться книги включая подкаталоги
-removeDir = f'{homeDir}\\removedBooks\\' # директория куда будут переноситься файля, для проверки их пользователем
+removeDir = f'{homeDir}\\removedBooks' # директория куда будут переноситься файля, для проверки их пользователем
 loadLibrary()
 dirTravel(homeDir)
 saveJson(library)
