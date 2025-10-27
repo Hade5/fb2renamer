@@ -10,10 +10,11 @@
     "size":123 - размер файла в байтах на тот случай
 """
 
-#todo проверка если у файла в названии уже есть постфикс больше 9
 #todo вывести в конце кол-во файлов общее, переименованных, на удаленте
 #todo исправить\дополнить комментарии к коду в виде документации
 #todo научиться извлекать книги из архивов и работать с ними
+#todo проблема обхода папки с удалением
+#todo проблема с уже существующими файлами в папке, надо либо заменять либо пропускать, либо имена новые делать
 
 import json
 import os
@@ -40,20 +41,19 @@ def getArgs():
 def log(text, color):
     match color:
         case "red":
-            print("\033[31m {}\033[0m" .format(text))
+            print(f'\033[31m {text}\033[0m')
         case "green":
-            print("\033[32m {}\033[0m" .format(text))
+            print(f'\033[32m {text}\033[0m')
         case "yellow":
-            print("\033[33m {}\033[0m" .format(text))
+            print(f'\033[33m {text}\033[0m')
         case "blue":
-            print("\033[34m {}\033[0m" .format(text))
+            print(f'\033[34m {text}\033[0m')
 
 # Загрудаем данные об уже обработанных файлах
 # Если файл с бибилотекой существует подгружаем из него данные, иначе создаем его
 def loadLibrary():
     if os.path.exists(homeDir + '\\library.json'):
-        readJson()
-        print("Load data from library file.")
+        return readJson()
     else:
         saveJson(library)
         print("Create library file.")
@@ -61,7 +61,6 @@ def loadLibrary():
 # Проходим по директориям и перебираем в ней файлы
 def dirTravel(inPath):
     global currentpath
-    # todo проблема обхода папки с удалением
     for root, dirs, files in os.walk(inPath):
         currentpath = root+'\\'
         print(f'Current path: {currentpath}')
@@ -89,7 +88,7 @@ def getFileData(filePath):
         mname = ''
     try:
         sequence = root.find('fb:description/fb:title-info/fb:sequence', ns)
-        if sequence != None:
+        if sequence is not None:
             seq = f' {sequence.get('name')}. {sequence.get('number')}.'
         else:
             seq = ''
@@ -101,10 +100,10 @@ def getFileData(filePath):
 
 # чтение файла с обработанными книгами
 def readJson():
-    global library
-    with open(homeDir + '\\library.json', 'r') as f:
-        library = json.load(f)
+    with open(f'{homeDir}\\library.json', 'r') as f:
+        library = json.load(f)    
     print('Read library file.')
+    return library
 
 # Метод сохранения данных в json файл
 def saveJson(data):
@@ -112,7 +111,7 @@ def saveJson(data):
             default=lambda o: o.__dict__, #перевод объекта в словать, для дальнейшей конвертации
             indent=4, #красивые отступы для чтения файла
             ensure_ascii=False )#кодировка
-    with open(homeDir + '\\library.json', 'w') as f:
+    with open(f'{homeDir}\\library.json', 'w') as f:
         f.write(str)
     print('Save library file.')
 
@@ -147,7 +146,6 @@ def delFileBook(fileName):
         os.remove(_filePath)
 
 # Переносим файл с книгой, которая уже есть в библиотеке
-# todo проблема с уже существующими файлами в папке, надо либо заменять либо пропускать, либо имена новые делать
 def remFileBook(fileName):
     if not os.path.exists(removeDir):
         os.mkdir(removeDir)
@@ -167,7 +165,7 @@ def diffBooks(nBook):
                 # преобразование объекта в тип класса
                 # нужна проверка на тип объекта, т.к. и json файла данные считываются в формате словаря,
                 # но при добавлении в память все еще счиатеся классом
-                if type(_book) == dict:
+                if isinstance(_book, dict):
                     _book = type('Book', (), _book)
                 if _book.name != nBook.name:
                     isNewBook = True
@@ -199,8 +197,6 @@ def checkHomeDir(path):
 
 
 #------------------------------- MAIN -------------------------------
-# переменная для хранения данных из json файла
-library = []
 # текущая директория в которой проверяются файлы, используется для работы с файлами на уровне ОС
 # переименование\копирование\удаление
 currentpath = ''
@@ -214,7 +210,7 @@ homeDir = checkHomeDir(args.path)
 # директория куда будут переноситься файля, для проверки их пользователем
 removeDir = f'{homeDir}\\removedBooks'
 
-loadLibrary()
+library = loadLibrary()
 dirTravel(homeDir)
 saveJson(library)
 
