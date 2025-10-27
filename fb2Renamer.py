@@ -25,10 +25,11 @@ import send2trash
 
 class Book:
     def __init__(self, name, file, size):
-        self.name = name.strip().replace("<", "").replace(">", "").replace(":", "").replace("«", "").replace("/", "").replace("|", "").replace("?", "").replace("*", "").replace("\\", "").replace("»","")
+        self.name = name.strip().replace("<", "").replace(">", "").replace(":", "").replace("«", "").replace("/", "").replace("|", "").replace("?", "").replace("*", "").replace("\\", "").replace("»","").replace("#", "")
         self.file = file
         self.size = size
 
+# определение входящих именованных параметров
 def getArgs():
     parser = argparse.ArgumentParser(prog='fb2Renamer', description='Rename file fb2 as book name in file')
     parser.add_argument('--path', help='Путь к входному файлу', type=str, required=True)
@@ -78,15 +79,17 @@ def getFileData(filePath):
     root = xml.getroot()
     ns = {'fb': 'http://www.gribuser.ru/xml/fictionbook/2.0'}
 
-    bookName = root.find('fb:description/fb:title-info/fb:book-title', ns).text
+    #todo поубирать везде лишние пробелы
+    bookName = root.find('fb:description/fb:title-info/fb:book-title', ns).text.strip()
     author = root.find('fb:description/fb:title-info/fb:author', ns)
-    fname = author.find('fb:first-name', ns).text
-    sname = author.find('fb:last-name', ns).text
+    fname = author.find('fb:first-name', ns).text.strip()
+    sname = author.find('fb:last-name', ns).text.strip()
     try:
-        mname = author.find('fb:middle-name', ns).text
+        mname = author.find('fb:middle-name', ns).text.strip()
     except:
         mname = ''
     try:
+        #todo проверка name и number т.к. чего-то из этого может нве быть
         sequence = root.find('fb:description/fb:title-info/fb:sequence', ns)
         if sequence is not None:
             seq = f' {sequence.get('name')}. {sequence.get('number')}.'
