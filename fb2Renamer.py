@@ -11,7 +11,6 @@
 """
 
 #todo проверка если у файла в названии уже есть постфикс больше 9
-#todo нормальные логи с подсветкой (по возможности)
 #todo вывести в конце кол-во файлов общее, переименованных, на удаленте
 #todo исправить\дополнить комментарии к коду в виде документации
 #todo научиться извлекать книги из архивов и работать с ними
@@ -29,6 +28,15 @@ class Book:
         self.file = file
         self.size = size
 
+def getArgs():
+    parser = argparse.ArgumentParser(prog='fb2Renamer', description='Rename file fb2 as book name in file')
+    parser.add_argument('--path', help='Путь к входному файлу', type=str, required=True)
+    parser.add_argument('--delFile', help='Удалять файл', type=bool, default=False)
+    parser.add_argument('--delToTrash', help='Даление в корзину. Включен по умолчанию, срабатывает только при включении удаления', type=bool, default=True)
+    parser.add_argument('--remFile', help='Переносить в папку delete файлы книг которые уже есть', type=bool, default=False)
+    return parser.parse_args()
+
+# выывод цветных логов в консоль
 def log(text, color):
     match color:
         case "red":
@@ -53,8 +61,8 @@ def loadLibrary():
 # Проходим по директориям и перебираем в ней файлы
 def dirTravel(inPath):
     global currentpath
-
-    for root, dirs, files in os.walk(inPath):        
+    # todo проблема обхода папки с удалением
+    for root, dirs, files in os.walk(inPath):
         currentpath = root+'\\'
         print(f'Current path: {currentpath}')
         for file in files:
@@ -112,17 +120,12 @@ def saveJson(data):
 def newBookName(bookname):
     print(f'\tGet new name for book: {bookname}.')
     num = 0
+    newName = bookname
     name, exp = os.path.splitext(bookname)
-    try:
-        if name[-3] == '(' and name[-1] == ')':
-            num = int(name[-2]) + 1
-        if num != 0:
-            num_str = f' ({num})'
-        else:
-            num_str =''
-    except:
-        num_str =''
-    return f'{name}{num_str}{exp}'
+    while os.path.exists(f'{currentpath}\\{newName}'):
+        num += 1
+        newName = f'{name} ({num}){exp}'
+    return newName
 
 # переименоване файла в название книги
 def renameFile(old_name, new_name):
@@ -144,6 +147,7 @@ def delFileBook(fileName):
         os.remove(_filePath)
 
 # Переносим файл с книгой, которая уже есть в библиотеке
+# todo проблема с уже существующими файлами в папке, надо либо заменять либо пропускать, либо имена новые делать
 def remFileBook(fileName):
     if not os.path.exists(removeDir):
         os.mkdir(removeDir)
@@ -160,10 +164,11 @@ def diffBooks(nBook):
             isNewBook = True
         else:
             for _book in library:
-                # нужна проверка на тип объеекта, т.к. и json файла данные считываются в формате словаря,
+                # преобразование объекта в тип класса
+                # нужна проверка на тип объекта, т.к. и json файла данные считываются в формате словаря,
                 # но при добавлении в память все еще счиатеся классом
                 if type(_book) == dict:
-                    _book = type('Book', (), _book) # преобразование объекта в тип класса, оставлен как пример
+                    _book = type('Book', (), _book)
                 if _book.name != nBook.name:
                     isNewBook = True
                 else:
@@ -193,22 +198,22 @@ def checkHomeDir(path):
         return path
 
 
-homeDir  = '' 
-library = []# переменная для хранения данных из json файла
+#------------------------------- MAIN -------------------------------
+# переменная для хранения данных из json файла
+library = []
+# текущая директория в которой проверяются файлы, используется для работы с файлами на уровне ОС
+# переименование\копирование\удаление
 currentpath = ''
 
 print('Program run...')
 
-# определение именнованных параметров
-parser = argparse.ArgumentParser(prog='fb2Renamer', description='Rename file fb2 as book name in file')
-parser.add_argument('--path', help='Путь к входному файлу', type=str, required=True)
-parser.add_argument('--delFile', help='Удалять файл', type=bool, default=False)
-parser.add_argument('--delToTrash', help='Даление в корзину. Включен по умолчанию, срабатывает только при включении удаления', type=bool, default=True)
-parser.add_argument('--remFile', help='Переносить в папку delete файлы книг которые уже есть', type=bool, default=False)
-args = parser.parse_args()
+# получаем список именованных аргументов
+args = getArgs()
+# директория в короторуй будут искаться книги включая подкаталоги
+homeDir = checkHomeDir(args.path)
+# директория куда будут переноситься файля, для проверки их пользователем
+removeDir = f'{homeDir}\\removedBooks'
 
-homeDir = checkHomeDir(args.path) # директория в короторуй будут искаться книги включая подкаталоги
-removeDir = f'{homeDir}\\removedBooks' # директория куда будут переноситься файля, для проверки их пользователем
 loadLibrary()
 dirTravel(homeDir)
 saveJson(library)
