@@ -15,7 +15,7 @@
 #todo научиться извлекать книги из архивов и работать с ними
 #todo проблема обхода папки с удалением
 #todo проблема с уже существующими файлами в папке, надо либо заменять либо пропускать, либо имена новые делать
-
+#todo remFile переместить файлы которые уже есть или не удалось прочитать в 
 import json
 import os
 import xml.etree.ElementTree as ET
@@ -33,6 +33,7 @@ class Book:
 def getArgs():
     parser = argparse.ArgumentParser(prog='fb2Renamer', description='Rename file fb2 as book name in file')
     parser.add_argument('--path', help='Путь к входному файлу', type=str, required=True)
+    parser.add_argument('--shortlog', help='Короткий лог, отобрвжаются только изменяемые файлы', type=bool, default=False)
     parser.add_argument('--delFile', help='Удалять файл', type=bool, default=False)
     parser.add_argument('--delToTrash', help='Даление в корзину. Включен по умолчанию, срабатывает только при включении удаления', type=bool, default=True)
     parser.add_argument('--remFile', help='Переносить в папку delete файлы книг которые уже есть', type=bool, default=False)
@@ -68,43 +69,83 @@ def dirTravel(inPath):
         for file in files:
             currentFile = f'{root}\\{file}'
             if os.path.splitext(file)[1].lower() == '.fb2':
-                print(f'\tFile in process: {file}.')
+                if not args.shortlog:
+                    print(f'\tFile in process: {file}.')
                 bookdata = getFileData(currentFile)
+                if bookdata is None:
+                    continue
                 newbook = Book(bookdata.get('book'), bookdata.get('file'), os.path.getsize(currentFile))
                 diffBooks(newbook)
 
 # читаем даныне из файла fb2
 def getFileData(filePath):
-    xml = ET.parse(filePath)
-    root = xml.getroot()
-    ns = {'fb': 'http://www.gribuser.ru/xml/fictionbook/2.0'}
+    try:
+        xml = ET.parse(filePath)
+        root = xml.getroot()
+        ns = {'fb': 'http://www.gribuser.ru/xml/fictionbook/2.0'}
 
-    #todo поубирать везде лишние пробелы
-    bookName = root.find('fb:description/fb:title-info/fb:book-title', ns).text.strip()
-    author = root.find('fb:description/fb:title-info/fb:author', ns)
-    fname = author.find('fb:first-name', ns).text.strip()
-    sname = author.find('fb:last-name', ns).text.strip()
-    try:
-        mname = author.find('fb:middle-name', ns).text.strip()
-    except:
-        mname = ''
-    try:
-        #todo проверка name и number т.к. чего-то из этого может нве быть
-        sequence = root.find('fb:description/fb:title-info/fb:sequence', ns)
-        if sequence is not None:
-            seq = f' {sequence.get('name')}. {sequence.get('number')}.'
+        bookName = root.find('fb:description/fb:title-info/fb:book-title', ns).text.strip()
+
+        author = root.find('fb:description/fb:title-info/fb:author', ns)
+        try:
+            fname = author.find('fb:first-name', ns).text.strip()
+        except: 
+            fname = ''
+        try:
+            sname = author.find('fb:last-name', ns).text.strip()
+        except:
+            sname = ''
+        try:
+            mname = author.find('fb:middle-name', ns).text.strip()
+        except:
+            mname = ''
+
+        fio = ''
+        if sname not in [None, '']:
+            fio = sname
+        if fio != '':
+            if fname not in [None, '']:
+                fio += f' {fname}'
         else:
-            seq = ''
-    except:
-        sequence = ''
-    #возвращаем ФИО автора, название книги из файла
-    book = f'{sname} {fname} {mname}'.strip() + f' -{seq} {bookName}.fb2'
-    return {"book":book , "file":os.path.basename(filePath)}
+            fio += f'{fname}'
+        if fio != '':
+            if mname not in [None, '']:
+                fio += f' {mname}'
+        else:
+            fio += f'{mname}'
+        if fio != '':
+            fio += ' -'
+        try:
+            seq = ' '
+            sequence = root.find('fb:description/fb:title-info/fb:sequence', ns)
+            if sequence is not None:
+                name = sequence.get('name').strip()
+                if name in [None, '']:
+                    name = ''
+                else:
+                    name = f' {name}.'
+
+                num = sequence.get('number').strip()
+                if num in [None, '']:
+                    num = ''
+                else:
+                    num = f' {num}.'
+
+                seq = f'{name}{num} '
+        except:
+            if fio != '': 
+                seq = ' '
+        #возвращаем ФИО автора, название книги из файла
+        book = f'{fio}{seq}{bookName}.fb2'
+        return {"book":book , "file":os.path.basename(filePath)}
+    except Exception as e:
+        log(f'\tError read file {filePath}.\n\tMessage: {str(e)}','red')
+        return None
 
 # чтение файла с обработанными книгами
 def readJson():
     with open(f'{homeDir}\\library.json', 'r') as f:
-        library = json.load(f)    
+        library = json.load(f)
     print('Read library file.')
     return library
 
@@ -119,23 +160,25 @@ def saveJson(data):
     print('Save library file.')
 
 # новое имя файла
-def newBookName(bookname):
-    print(f'\tGet new name for book: {bookname}.')
+def newBookName(bookname):    
     num = 0
     newName = bookname
     name, exp = os.path.splitext(bookname)
     while os.path.exists(f'{currentpath}\\{newName}'):
         num += 1
         newName = f'{name} ({num}){exp}'
+
+    print(f'\tGet new name for book: {bookname} - {newName}.')
     return newName
 
 # переименоване файла в название книги
 def renameFile(old_name, new_name):
     try:
         os.rename(f'{currentpath}{old_name}', f'{currentpath}{new_name}')
-        log(f'\tFile {old_name} renemaed to {new_name}.','green')
-    except:
-        log(f'\tError in rename {old_name} to {new_name}.','red')
+        if not args.shortlog:
+            log(f'\tFile {old_name} renemaed to {new_name}.','green')
+    except Exception as e:
+        log(f'\tError in rename {old_name} to {new_name}.\nMessage {str(e)}.','red')
 
 # Удаляем файл с книгой, которая уже есть в библиотеке
 def delFileBook(fileName):
@@ -157,7 +200,8 @@ def remFileBook(fileName):
 
 # сравниваем полученые данные файла с уже имеющимися
 def diffBooks(nBook):
-    print(f'\tSearch in library book: {nBook.name}.')
+    if not args.shortlog:
+        print(f'\tSearch in library book: {nBook.name}.')
     isNewBook = False
 
     if nBook.file != nBook.name:
@@ -187,7 +231,8 @@ def diffBooks(nBook):
                     break
 
         if isNewBook:
-            print(f'\tNew book from library: {nBook.name}')
+            if not args.shortlog:
+                print(f'\tNew book from library: {nBook.name}')
             renameFile(nBook.file, nBook.name)
             library.append(nBook)
 
@@ -203,7 +248,7 @@ def checkHomeDir(path):
 # текущая директория в которой проверяются файлы, используется для работы с файлами на уровне ОС
 # переименование\копирование\удаление
 currentpath = ''
-
+library = []
 print('Program run...')
 
 # получаем список именованных аргументов
