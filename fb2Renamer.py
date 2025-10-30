@@ -15,7 +15,8 @@
 #todo научиться извлекать книги из архивов и работать с ними
 #todo проблема обхода папки с удалением
 #todo проблема с уже существующими файлами в папке, надо либо заменять либо пропускать, либо имена новые делать
-#todo remFile переместить файлы которые уже есть или не удалось прочитать в 
+#todo remFile переместить файлы которые уже есть или не удалось прочитать
+
 import json
 import os
 import xml.etree.ElementTree as ET
@@ -25,7 +26,10 @@ import send2trash
 
 class Book:
     def __init__(self, name, file, size):
-        self.name = name.strip().replace("<", "").replace(">", "").replace(":", "").replace("«", "").replace("/", "").replace("|", "").replace("?", "").replace("*", "").replace("\\", "").replace("»","").replace("#", "")
+        simbols = ['<', '>', ':', '«', '»', '/', '|', '?', '*', '\\', '#', '\xe4',]
+        self.name = name
+        for x in simbols:
+            self.name = name.replace(x, "")
         self.file = file
         self.size = size
 
@@ -33,13 +37,14 @@ class Book:
 def getArgs():
     parser = argparse.ArgumentParser(prog='fb2Renamer', description='Rename file fb2 as book name in file')
     parser.add_argument('--path', help='Путь к входному файлу', type=str, required=True)
-    parser.add_argument('--shortlog', help='Короткий лог, отобрвжаются только изменяемые файлы', type=bool, default=False)
-    parser.add_argument('--delFile', help='Удалять файл', type=bool, default=False)
-    parser.add_argument('--delToTrash', help='Даление в корзину. Включен по умолчанию, срабатывает только при включении удаления', type=bool, default=True)
+    parser.add_argument('--shortlog', help='Короткий лог, отобрвжаются только ошибки и удаление файлов', type=bool, default=False)
+    parser.add_argument('--delFile', help='Удалять исходный файл книги которая уже есть', type=bool, default=False)
+    parser.add_argument('--delToTrash', help='Удаление в корзину. Включен по умолчанию, срабатывает только при включении удаления', type=bool, default=True)
     parser.add_argument('--remFile', help='Переносить в папку delete файлы книг которые уже есть', type=bool, default=False)
     return parser.parse_args()
 
-# выывод цветных логов в консоль
+# вывод цветных логов в консоль
+# работает только в консоли питона, в powershell не работает скорее всего в консоли тоже
 def log(text, color):
     match color:
         case "red":
@@ -146,7 +151,7 @@ def getFileData(filePath):
 def readJson():
     with open(f'{homeDir}\\library.json', 'r') as f:
         library = json.load(f)
-    print('Read library file.')
+    if not args.shortlog: print('Read library file.')
     return library
 
 # Метод сохранения данных в json файл
@@ -157,7 +162,7 @@ def saveJson(data):
             ensure_ascii=False )#кодировка
     with open(f'{homeDir}\\library.json', 'w') as f:
         f.write(str)
-    print('Save library file.')
+    if not args.shortlog: print('Save library file.')
 
 # новое имя файла
 def newBookName(bookname):    
@@ -168,7 +173,7 @@ def newBookName(bookname):
         num += 1
         newName = f'{name} ({num}){exp}'
 
-    print(f'\tGet new name for book: {bookname} - {newName}.')
+    if not args.shortlog: print(f'\tGet new name for book: {bookname} - {newName}.')
     return newName
 
 # переименоване файла в название книги
